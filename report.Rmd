@@ -1,0 +1,668 @@
+---
+title: "A study of the 2014-2015 NBA dataset"
+author: "Harout Barikian"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  pdf_document:
+    toc: yes
+  bookdown::pdf_document2:
+    toc: yes
+    number_sections: yes
+    keep_tex: yes
+    citation_package: natbib
+    fig_caption: yes
+    highlight: haddock
+    df_print: kable
+    extra_dependencies:
+      caption: labelfont={bf}
+  html_document:
+    toc: yes
+    df_print: paged
+fontsize: 12pt
+fontfamily: times
+geometry: margin=1in
+email: BarikianH@cardiff.ac.uk
+bibliography: refs.bib
+biblio-style: apalike
+link-citations: yes
+abstract: We displayed how we can apply diverse descriptive and inferential statistical tools to the NBA dataset. Teams playing at home might have a higher chance of winning than teams playing away. Also, teams playing with a three points style might be more efficient to win games; there was a strong positive correlation between the three points per game scored and the win rate of a team. Then we saw that the points per game scored by players between different teams were homogeneous for the variances. Besides, the median of points per game scored by the players was not likely impacted by the rank of their respective teams. In the end, we analysed the accuracy of each shot taken compared to the distance and it appears to be a strong negative correlation between the two variables. But for Kyle Korver, the distance seems to not have an impact on his shooting accuracy.
+---
+
+<!-- main body starts here -->
+
+\newpage
+
+# Introduction {#sec:intro}
+
+The National Basketball Association, believed by many to be the best basketball league in the world. In this report, we are going to analyse the 2014-2015 regular season. In the first part, the focus will be on overall Team performance and in the following part, we will be talking about player-related performance.
+
+To begin with, the home and away win percentage will be tested to see if teams usually win more when playing at home instead of away. Furthermore, we will try to see the playing style of each team, meaning if a team is revolving around shooting more three points and playing near the arc or go more inside near the basket and score two points. After that, we will check if there is any correlation between the number of three points per game scored and the win percentage of a team. In the end, we will study the points per game scored by each player in a team and look if there is any significant dispersion between the points. We will also analyse if there is an impact on the points per game by each team's ranking.
+
+Going into the second part, we will test to see if the shooting distance affects the scoring ability of all the players in the league. Then we will rank all the players by their three points per game scoring average, picking $Kyle$ $Korver$ and then analysing his scoring frequency depending on the shooting distance. In this way, we can try to understand if the top player is also affected or not by the distance factor like all the other players.
+
+# Background
+
+To establish the ideas and topics that we will talk about in this report, many articles were found online that inspired and may justify the hypothesis presented.
+According to (Entine, 2007), it seems that Home court advantages were related to the resting period teams were having as the away team was less rested due to going on the road. In addition, according to (Cheema, 2021), referee bias was found for the home team as they would call for fouls more often against the away team. All of this seems to support and explain the results we got.
+
+(Babb, 2013) mentions in his article how the introduction of the three points in a team's play helps in having more options in the offense, like opening lanes for penetration and creating room for operation under in the post. He also talks about $Kyle$ $Korver$ and how good of a shooter he is, describing him with 'This guy's shot always looks like it's going in'. In another article written by (Goldsberry, 2019), he talks about the effect of three points scored on the team's win conditions, with Popovich(former San Antonio Spurs coach) stating 'Now you look at a stat sheet after a game and the first thing you look at is the 3s. If you made 3s and the other team didn't, you win'. The NBA seems to be revolving around the three points mark after all.
+
+Lastly, we will check the disparity in points per game between players in a team, as (Grant, 2018) said, having too many star players in a team affected the performance because everyone wanted to be the alpha dog. Teams with only three star players won more games than teams with four or five.
+
+After all the interesting ideas are read and seen, we will dive right into the statistical analysis of this NBA dataset. 
+
+\newpage
+```{r, echo=FALSE, results='hide', fig.show='hide'}
+nba <- read.csv('nbadata.csv',header = T) 
+
+nba <- nba[nba$TOUCH_TIME >= 0,]
+nba <- na.omit(nba)
+
+
+## 3.1 Team Based Home Win Advantage
+
+GAME_ID <- c()
+HOME_TEAM <- c()
+AWAY_TEAM <- c()
+LOCATION <- c()
+W <- c()
+
+for(x in unique(nba$GAME_ID)){
+    
+    GAME_ID<-c(GAME_ID, x)
+    
+    HOME_TEAM<-c(as.character(HOME_TEAM), as.character(unique(nba$HOME_TEAM[nba$GAME_ID==x])))
+    
+    AWAY_TEAM<-c(as.character(AWAY_TEAM), as.character(unique(nba$AWAY_TEAM[nba$GAME_ID==x])))
+    
+    LOCATION<-c(as.character(LOCATION), as.character(unique(nba$LOCATION[nba$GAME_ID==x])[1]))
+    
+    W<-c(as.character(W), as.character(unique(nba$W[nba$GAME_ID==x])[1]))
+    
+}
+
+ nba_df<-data.frame(GAME_ID, HOME_TEAM,
+                       AWAY_TEAM,
+                       LOCATION,
+                       W)
+ 
+ H<-nba_df$LOCATION=='H'
+A<-nba_df$LOCATION=='A'
+Win<-nba_df$W=='W'
+Lose<-nba_df$W=='L'
+
+AWAY_WINS<-sum(H & Lose) + sum(A & Win)
+HOME_WINS<-sum(H & Win) + sum(A & Lose)
+
+HOME_WINS_pct<-HOME_WINS/(HOME_WINS+AWAY_WINS)*100
+AWAY_WINS_pct<-AWAY_WINS/(HOME_WINS+AWAY_WINS)*100
+
+TEAM<-c()
+H_WINS<-c()
+H_LOSSES<-c()
+A_WINS<-c()
+A_LOSSES<-c()
+
+HT<-nba_df$HOME_TEAM
+AT<-nba_df$AWAY_TEAM
+
+for(x in unique(nba_df$HOME_TEAM)){
+  
+    TEAM<-c(TEAM,x)
+    
+    H_WINS<-c(H_WINS, sum(H[HT==x] & Win[HT==x] | A[HT==x] & Lose[HT==x]))
+    H_LOSSES<-c(H_LOSSES, sum(H[HT==x] & Lose[HT==x] | A[HT==x] & Win[HT==x]))
+    A_WINS<-c(A_WINS, sum(H[AT==x] & Lose[AT==x] | A[AT==x] & Win[AT==x]))
+    A_LOSSES<-c(A_LOSSES, sum(H[AT==x] & Win[AT==x] | A[AT==x] & Lose[AT==x]))
+}
+
+nba_HOMEdf<-data.frame(TEAM,
+                       H_WINS,
+                       H_LOSSES
+                       )
+
+nba_AWAYdf<-data.frame(TEAM,
+                       A_WINS,
+                       A_LOSSES
+                       )
+
+H_WIN_PCT<-c()
+A_WIN_PCT<-c()
+DIFF_PCT<-c()
+
+T<-nba_HOMEdf$TEAM
+
+for(x in nba_HOMEdf){
+  
+    H_WIN_PCT<-c(H_WIN_PCT, round(H_WINS[T==x]/(H_WINS[T==x]+H_LOSSES[T==x])*100))
+    A_WIN_PCT<-c(A_WIN_PCT, round(A_WINS[T==x]/(A_WINS[T==x]+A_LOSSES[T==x])*100))
+    DIFF_PCT<-c(DIFF_PCT, H_WIN_PCT[T==x]-A_WIN_PCT[T==x])
+    
+}
+
+nba_TEAM_W_PCT<-data.frame(TEAM,
+              H_WIN_PCT,
+              A_WIN_PCT,
+              DIFF_PCT
+)
+
+nba_TEAM_W_PCT<-nba_TEAM_W_PCT[
+  with(nba_TEAM_W_PCT, order(-H_WIN_PCT)),
+]
+
+## 3.2 Team based Style of Play 2 or 3 pts 
+
+TEAMS<-c()
+TwoPts<-c()
+ThreePts<-c()
+TwoPtsPG<-c()
+ThreePtsPG<-c()
+W_PCT<-c()
+
+for(x in unique(nba$HOME_TEAM)){
+    
+    TEAMS<-c(TEAMS,x)
+    
+    ThreePts<-c(ThreePts, sum(nba$PTS[nba$PTS_TYPE=='3' & nba$SHOT_RESULT=='made' & nba$HOME_TEAM==x & nba$LOCATION=='H'])+sum(nba$PTS[nba$PTS_TYPE=='3' & nba$SHOT_RESULT=='made' & nba$AWAY_TEAM==x & nba$LOCATION=='A']))
+    ThreePtsPG<-c(ThreePtsPG, round(tail(ThreePts, n=1)/length(unique(nba$GAME_ID[nba$HOME_TEAM==x | nba$AWAY_TEAM==x])),0))
+    
+    TwoPts<-c(TwoPts,sum(nba$PTS[nba$PTS_TYPE=='2' & nba$SHOT_RESULT=='made' & nba$HOME_TEAM==x & nba$LOCATION=='H'])+sum(nba$PTS[nba$PTS_TYPE=='2' & nba$SHOT_RESULT=='made' & nba$AWAY_TEAM==x & nba$LOCATION=='A']))
+    TwoPtsPG<-c(TwoPtsPG, round(tail(TwoPts, n=1)/length(unique(nba$GAME_ID[nba$HOME_TEAM==x | nba$AWAY_TEAM==x])),0))
+    
+    W_PCT<-c(W_PCT,round((H_WINS[T==x]+A_WINS[T==x])/(H_WINS[T==x]+A_WINS[T==x]+H_LOSSES[T==x]+A_LOSSES[T==x]),4)*100)
+
+}
+
+TEAM_RANKdf<-data.frame(TEAMS,
+                        TwoPtsPG,
+                        ThreePtsPG,
+                      W_PCT)
+
+TEAM_RANKdf<-TEAM_RANKdf[
+  with(TEAM_RANKdf, order(-W_PCT)),
+]
+
+STYLE<-c()
+RANK<-c(1:30)
+
+for(x in TEAM_RANKdf$TEAMS){
+
+    if(TEAM_RANKdf$ThreePtsPG[TEAM_RANKdf$TEAMS==x]>=round(mean(TEAM_RANKdf$ThreePtsPG))){
+        STYLE<-c(STYLE,3 )
+    }
+    
+    else{STYLE<-c(STYLE, 2 )}
+}                                                      
+
+ThreePtsPG<-TEAM_RANKdf$ThreePtsPG
+TwoPtsPG<-TEAM_RANKdf$TwoPtsPG
+W_PCT<-TEAM_RANKdf$W_PCT
+TEAMS<-TEAM_RANKdf$TEAMS
+
+TEAMdf<-data.frame(RANK,
+                   TEAMS,
+                   TwoPtsPG,
+                   ThreePtsPG,
+                   STYLE,
+                   W_PCT
+                        )
+
+
+### 3.3 Team points dispersion...
+
+PLAYER<-c()
+
+for(x in unique(nba$HOME_TEAM)){
+    for(p in unique(nba$PLAYER_NAME[(nba$HOME_TEAM==x & nba$LOCATION=='H') | (nba$AWAY_TEAM==x & nba$LOCATION=='A')])){
+        PLAYER<-c(PLAYER, p)
+       }
+    }
+
+DUPLICATED_NAMES<-c()
+
+for (x in 1:length(duplicated(PLAYER))){
+    
+    if(duplicated(PLAYER)[x]){
+        
+        DUPLICATED_NAMES<-c(DUPLICATED_NAMES, as.character(PLAYER[x]))
+    }
+    
+}
+
+TEAM<-c()
+POINTS<-c()
+GAMES<-c()
+PPG<-c()
+z<-c()
+
+for (x in PLAYER){
+    
+    if(x %in% DUPLICATED_NAMES){
+        
+        if(x %in% z){
+            TEAM<-c(TEAM, as.character(unique(nba$HOME_TEAM[nba$PLAYER_NAME==x & nba$LOCATION=='H'])[1]))
+            POINTS<-c(POINTS, sum(nba$PTS[nba$PLAYER_NAME==x & ((nba$LOCATION=='H' & nba$HOME_TEAM==tail(TEAM, n=1)) | (nba$LOCATION=='A' & nba$AWAY_TEAM==tail(TEAM, n=1)))]))
+            GAMES<-c(GAMES, length(unique(nba$GAME_ID[nba$PLAYER_NAME==x & ((nba$LOCATION=='H' & nba$HOME_TEAM==tail(TEAM, n=1)) | (nba$LOCATION=='A' & nba$AWAY_TEAM==tail(TEAM, n=1)))])))
+            PPG<-c(PPG, tail(POINTS, n=1)/tail(GAMES, n=1))    
+        }
+        
+        else{
+        TEAM<-c(TEAM, as.character(unique(nba$HOME_TEAM[nba$PLAYER_NAME==x & nba$LOCATION=='H'])[2]))
+        POINTS<-c(POINTS, sum(nba$PTS[nba$PLAYER_NAME==x & ((nba$LOCATION=='H' & nba$HOME_TEAM==tail(TEAM, n=1)) | (nba$LOCATION=='A' & nba$AWAY_TEAM==tail(TEAM, n=1)))]))
+        GAMES<-c(GAMES, length(unique(nba$GAME_ID[nba$PLAYER_NAME==x & ((nba$LOCATION=='H' & nba$HOME_TEAM==tail(TEAM, n=1)) | (nba$LOCATION=='A' & nba$AWAY_TEAM==tail(TEAM, n=1)))])))
+        PPG<-c(PPG, tail(POINTS, n=1)/tail(GAMES, n=1))
+        z<-c(z, x)    
+        }
+    }
+    
+    else{
+        TEAM<-c(TEAM, as.character(unique(nba$HOME_TEAM[nba$PLAYER_NAME==x & nba$LOCATION=='H'])))
+        POINTS<-c(POINTS, sum(nba$PTS[nba$PLAYER_NAME==x & ((nba$LOCATION=='H' & nba$HOME_TEAM==tail(TEAM, n=1)) | (nba$LOCATION=='A' & nba$AWAY_TEAM==tail(TEAM, n=1)))]))
+        GAMES<-c(GAMES, length(unique(nba$GAME_ID[nba$PLAYER_NAME==x])))
+        PPG<-c(PPG, tail(POINTS, n=1)/tail(GAMES, n=1))
+    }
+    
+}
+
+PLAYER_PTSdf<-data.frame(PLAYER,
+                         TEAM,
+                         POINTS,
+                         GAMES,
+                         PPG
+                         )
+
+PLAYER_PTSdf<-PLAYER_PTSdf[with(PLAYER_PTSdf, order(-PPG)),]
+
+#PLAYER_RANK<-c(1:length(PLAYER_PTSdf$PLAYER))
+PLAYER<-PLAYER_PTSdf$PLAYER
+TEAM<-PLAYER_PTSdf$TEAM
+POINTS<-PLAYER_PTSdf$POINTS
+GAMES<-PLAYER_PTSdf$GAMES
+PPG<-PLAYER_PTSdf$PPG
+
+PLAYERSdf<-data.frame( PLAYER,
+                      TEAM,
+                      POINTS,
+                      GAMES,
+                      PPG
+                         )
+
+TEAM_RANK<-c()
+
+for(x in PLAYERSdf$TEAM){
+    
+    TEAM_RANK<-c(TEAM_RANK, TEAMdf$RANK[TEAMdf$TEAM==x])
+}
+
+PLAYERSdf$TEAM_RANK<-TEAM_RANK
+
+PLAYERSdf<-PLAYERSdf[PLAYERSdf$GAMES >=30, ]
+
+PLAYERSdf<-PLAYERSdf[with(PLAYERSdf, order(TEAM_RANK, -PPG)),]
+
+## 4.1 Player shot accuracy compared to distance shooting.
+
+i=0
+ACCURACY<-c()
+DISTANCES<-c()
+SHOTS_TAKEN <-c()
+
+while( i <= 35 ){
+    
+    ACCURACY<-c(ACCURACY, round((sum(nba$SHOT_DIST==i & nba$FGM==1)/sum(nba$SHOT_DIST==i ))*100))
+    
+    SHOTS_TAKEN <-c(SHOTS_TAKEN, sum(nba$SHOT_DIST==i))
+
+    DISTANCES<-c(DISTANCES, i)
+    i=i+1
+}
+
+
+DISTdf<-data.frame(DISTANCES,
+                  ACCURACY,
+                  SHOTS_TAKEN)
+
+
+## 4.2 Lets check some of the best distance shooters: Kyle Korver
+
+kyle<-nba$PLAYER_NAME=='Kyle Korver'
+
+ACC_THREE<-c()
+THREE_ATTEMPTS<-c()
+
+GP<-c()
+
+P_NAME<-c()
+
+for(x in unique(nba$PLAYER_NAME)){
+    
+    P_NAME<-c(P_NAME, x)
+        
+    GP<-c(GP, length(unique(nba$GAME_ID[nba$PLAYER_NAME==x])))
+    
+    ACC_THREE<-c(ACC_THREE, (round(sum(nba$FGM==1 & nba$PTS_TYPE==3 & nba$PLAYER_NAME==x)/sum(nba$PTS_TYPE==3 & nba$PLAYER_NAME==x)*100)))
+    THREE_ATTEMPTS<-c(THREE_ATTEMPTS, sum(nba$PTS_TYPE==3 & nba$PLAYER_NAME==x))
+
+}
+
+THREE_ACCdf<-data.frame(P_NAME,
+                         ACC_THREE,
+                         THREE_ATTEMPTS)
+
+THREE_ACCdf <- THREE_ACCdf[THREE_ACCdf$THREE_ATTEMPTS > 300 ,]
+
+THREE_ACCdf <- THREE_ACCdf[with(THREE_ACCdf, order(-ACC_THREE)),]
+
+i=0
+
+KACCURACY<-c()
+KDISTANCES<-c()
+
+while( i <= max(nba$SHOT_DIST[nba$PLAYER_NAME=='Kyle Korver']) ){
+    
+    KACCURACY<-c(KACCURACY, round((sum(nba$SHOT_DIST>=i & nba$SHOT_DIST<(i+2) & nba$FGM==1 & nba$PLAYER_NAME=='Kyle Korver')/sum(nba$SHOT_DIST>=i & nba$SHOT_DIST<(i+2) & nba$PLAYER_NAME=='Kyle Korver'))*100))
+    KDISTANCES<-c(KDISTANCES, i+2)
+    i=i+2
+}
+
+KYLE_DISTdf<-data.frame(KDISTANCES,
+                  KACCURACY)
+
+
+```
+
+# Team-based hypothesis {#sec:TeamBased}
+
+## Home/Away win percentage comparison {#sec:Home-Away}
+
+Teams in sports competitions tend to win more playing home games rather than away. Table \@ref(tab:h-a-diff) shows some of the teams home and away win percentages, with the column (DIFF_PCT) calculating the difference between the two values. For example, Portland Trail Blazers $POR$ seems to struggle to win away with a $29$% deficit when not playing at home. We are going to test to determine whether the true mean of home wins is larger than the true mean of away wins for all the teams.
+
+```{r h-a-diff, echo=FALSE, fig.show='hold', fig.align='center'}
+
+ knitr::kable( 
+   head(nba_TEAM_W_PCT, 5), caption = 'First five rows of the Home and Away win percentages per Team',
+   booktabs = TRUE)
+```
+
+   
+```{r hapie,echo=FALSE, comment=NA,message=FALSE, fig.align='center',fig.show='hold', fig.cap='Home and Away win percentages', fig.height = 3.5, fig.width = 3.5}
+
+library(mvnormtest)
+
+lbls <- c('Home Wins','Away Wins')
+slices <- c(HOME_WINS,AWAY_WINS)
+pct <- round(slices/sum(slices)*100)
+lbls <- paste(lbls, pct)
+lbls <- paste(lbls,"%",sep="")
+
+pie(slices,labels=lbls,col=c('red','blue'))
+
+t1 <- t.test(H_WIN_PCT, A_WIN_PCT, alternative='greater')
+
+s1 <- mshapiro.test(rbind(H_WIN_PCT, A_WIN_PCT))
+
+cat('two sample t-test                Multivariate Shapiro-Wilk normality test')
+cat('p-value:', t1$p.value, '            w= ', s1$statistic, '; p-value', s1$p.value)
+cat('confidence interval:', t1$conf.int)
+cat('sample estimates:', t1$estimate)
+
+
+```
+
+Even though the number of observations $n=30$ is not too large, there are some pieces of evidence suggesting that the data follow a gaussian distribution with a p-value of $0.18$ for the multivariate shapiro-wilk test. Therefore we do not reject $H_{0}$ for $H_{1}$ at the significance level $\alpha=0.05$, making the Gaussian approximation to be relatively accurate. 
+
+The obtained p-value for the two sample t-test of $0.004$ is notably smaller than the considered significance level $\alpha=0.05$. We thus reject $H_{0}$ for $H_{1}$ at the significance level $\alpha=0.05$. There are strong statistical evidences suggesting that the teams playing at home might have a higher chance of winning than the teams playing away, as shown in figure \@ref(fig:hapie).
+
+## Attacking team playing style  {#sec:PlayingStyle}
+
+```{r bar-style, echo=FALSE, comment=NA, fig.cap='Barplot for the number of teams for each playing style', out.height="40%", out.width="50%"}
+
+barplot(table(TEAMdf$STYLE), col=rainbow(2), xlab = "Playing style", ylab = "Number of teams", ylim=c(0,25))
+```
+
+```{r box-style, echo=FALSE, comment=NA, fig.cap='Boxplot for the teams ranking and their playing style', out.height="40%", out.width="50%"}
+
+boxplot(TEAMdf$RANK~TEAMdf$STYLE, xlab = "Playing style", ylab = "Rank", col=rainbow(2))
+
+```
+
+To qualify a team into a specific category, we assumed that if a team scores three points per game more than the mean of all teams, it would be categorised as a 'three points style of play'. Else, it would be in the 'two points style of play'. The mean is equal to $19.16$ three points per game, rounded to a $19$ to make it more practical.
+
+In the barplot shown in figure \@ref(fig:bar-style), we can clearly notice that the teams playing a three points style of game ($12$) are less than those playing more of a two points style of game ($18$); this could be because it is a more difficult play style as you need very good distance shooters in the team.
+
+In the boxplot represented in figure \@ref(fig:box-style), we can see that the teams using a three point style look to be better in the rankings compared to the opposite two point style of play. We will test this hypothesis by comparing the true mean of win percentage from each style of play. After that, we will check if there is a correlation between the win percentage of a team and the three points per game scored.
+
+```{r, echo=FALSE, comment=NA}
+
+t2 <- t.test(TEAMdf$W_PCT[TEAMdf$STYLE==3], TEAMdf$W_PCT[TEAMdf$STYLE==2], alternative='greater')
+
+s2 <- shapiro.test(TEAMdf$W_PCT)
+
+cat('two sample t-test                Shapiro-Wilk normality test')
+cat('p-value:', t2$p.value, '            w= ', s2$statistic, '; p-value', s2$p.value)
+cat('confidence interval:', t2$conf.int)
+cat('sample estimates:', t2$estimate)
+
+```
+Even though the number of observations $n=30$ is not too large, there is strong evidences that the data follow a gaussian distribution with a p-value of $0.36$ for the shapiro-wilk test. Therefore we do not reject $H_{0}$ for $H_{1}$, making the Gaussian approximation to be relatively accurate.
+
+The obtained p-value for the two sample t-test of $0.0004$ is very small, smaller than the considered significance level $\alpha=0.05$. We thus reject $H_{0}$ for $H_{1}$ at the significance level $\alpha=0.05$, these are strong statistical evidences suggesting that the teams with a three point playing style are more likely to have a higher win percentage than the teams focusing more on a two points style of play.
+
+```{r scatter1, echo=FALSE, warning=FALSE, message=FALSE, comment=NA,fig.cap='Scatter plot and correlation results between three points per game and win percentages', fig.align='center', fig.height = 3, fig.width = 5}
+
+library(ggpubr)
+library(mvnormtest)
+
+ggscatter(TEAMdf, x = 'ThreePtsPG', y = 'W_PCT')+
+stat_cor(method = "pearson", alternative='two.sided', 
+         label.x=18, label.y=20, size=5)+             
+geom_smooth(method = "lm", se=TRUE, color='red', formula = y~x,
+            level=0.99)
+
+s3 <- mshapiro.test(rbind(TEAMdf$ThreePtsPG, TEAMdf$W_PCT))
+
+cat('Multivariate Shapiro-Wilk normality test')
+cat('w= ', s3$statistic, '; p-value', s3$p.value)
+
+```
+
+The data in figure \@ref(fig:scatter1) suggest that there is a statistically significant positive correlation between the team's win percentage and their three points per game score.
+\newpage
+At a significance level of $\alpha=0.05$ we observe a correlation of $R=0.65$ with a very small p-value. The multivariate normality assumption does seem to be verified with a p-value of $0.099$ which is marginally larger than the significance level $\alpha=0.05$;  The result of our correlation analysis might be reliable. Thus there would possibly be a correlation between the three points per game scored and the win rate of a team.
+
+
+## In team's points dispersion {#sec:PPGinTeams} 
+
+```{r box-rank, echo=FALSE,fig.cap='Boxplot of each player\'s points per game by its team rank', fig.align='center', fig.height = 4, fig.width = 5}
+
+boxplot(PLAYERSdf$PPG~PLAYERSdf$TEAM_RANK, xlab = 'TEAM RANK', ylab = 'PPG', col=rainbow(2))
+
+```
+In figure \@ref(fig:box-rank), we can see the points per game scored by each team and their placement in the ranking. We can notice some outliers in this boxplot, the number one ranked team has two outliers with high scoring average, which shows that this team have already two of the very best players, much better than the other players from that same team. on the other hand, we can also see an outlier in one of the lowest ranked teams. 
+
+To examine more the outliers we just talked about, we will use the a pie chart of the points per game scored by each player in the team. We will look for the first ranked team GSW $Golden$ $State$ $Warriors$ and the lowest ranked team NYK $New$ $York$ $Knicks$.
+
+```{r pies, echo=FALSE, fig.show='hold', fig.cap='Pie charts for the points per game scored by the Golden State Warriors and New York Knicks players', out.height="50%", out.width="50%"}
+
+lbls <- PLAYERSdf$PLAYER[PLAYERSdf$TEAM=='GSW']
+slices <- PLAYERSdf$PPG[PLAYERSdf$TEAM=='GSW']
+pct <- round(slices,2)
+lbls <- paste(lbls, pct)
+lbls <- paste(lbls,'PPG',sep="")
+
+pie(slices,labels=lbls,col=rainbow(10),main='Golden State Warriors')
+
+lbls <- PLAYERSdf$PLAYER[PLAYERSdf$TEAM=='NYK']
+slices <- PLAYERSdf$PPG[PLAYERSdf$TEAM=='NYK']
+pct <- round(slices,2)
+lbls <- paste(lbls, pct)
+lbls <- paste(lbls,'PPG',sep="")
+
+pie(slices,labels=lbls,col=rainbow(10),main='New York Knicks')
+
+```
+
+From the two pie charts shown in figure \@ref(fig:pies), we can clearly see that $Stephen$ $Curry$ and $Clay$ $Thompson$ have very high points per game compared to their teammates, with $19.19 PPG$ and $18.22 PPG$ each. In addition, $Carmelo$ $Anthony$ is the top scorer in his team with a $18.84 PPG$; $9 PPG$ more than the second-best in the team ($Time$ $Hardaway$ $Jr$ with $9.3 PPG$).
+
+We are going to test the equality (homogeneity) of variance across the teams, using the fligner, bartlett and Levene tests.
+
+```{r, echo=FALSE, comment=NA, warning=FALSE, message=FALSE}
+
+PLAYERSdf$TEAM_RANK <- factor(PLAYERSdf$TEAM_RANK)
+
+fligner.test(PPG ~ TEAM_RANK, data=PLAYERSdf)
+
+bartlett.test(PPG ~ TEAM_RANK, data=PLAYERSdf)
+
+cat('Levene test of homogeneity of variances')
+
+library(car)
+leveneTest(PPG ~ TEAM_RANK, data=PLAYERSdf)
+
+```
+
+From the output of the fligner, bartlett and Levene tests, we see that the p-values are relatively large ($0.52, 0.12$ and $0.51$). This means that there is no statistical evidence that the variances are significantly different (for instance, at $\alpha=0.05$, we do not reject the null hypothesis). We can therefore assume there is a homogeneity of variances in the different groups.
+
+```{r norm, echo=FALSE, comment=NA,fig.cap='Qunatile-quantile plot of the anova residuals against the expected normal distribution', out.height="50%", out.width="50%"}
+res.aov <- aov(PPG ~ TEAM_RANK, data=PLAYERSdf)
+
+shapiro.test(res.aov$residuals)
+
+plot(res.aov, 2)
+```
+\newpage
+The very small p-value of the Shapiro-Wilk normality test and the qqplot shown in figure \@ref(fig:norm) suggests that we should reject $H_{0}$ for $H_{1}$. There are statistical evidences suggesting that the residuals may not be Gaussian. Because of this, we cannot use the $anova$ test as the conditions are not met. We will therefore use the $Kruskal-Wallis$ test that is an alternative for $anova$.
+
+
+```{r, echo=FALSE, comment=NA}
+
+kruskal.test(PPG ~ TEAM_RANK, data=PLAYERSdf)
+
+```
+
+From the $Kruskal-Wallis$ test just performed, the obtained p-value is very high ($0.99$); for instance we do not reject $H_{0}$ for $H_{1}$. The test thus suggests that the median of $PPG$ scored by the players are not impacted by the rank of that team. 
+
+# Player based hypothesis {#sec:PlayerBased}
+
+## General shooting accuracy {#sec:Shot-Dist}
+
+```{r dist-fgm, echo=FALSE, fig.show='hold', fig.cap='Histogram of the shot\'s distances density and a Boxplot of the shot\'s result from the distance taken', out.height="50%", out.width="50%"}
+Distance <- nba$SHOT_DIST
+
+hist(Distance, freq=FALSE, col='cyan')
+
+boxplot(nba$SHOT_DIST~nba$FGM,xlab = 'Missed or Scored', ylab = 'SHOT DISTANCE', col=rainbow(2))
+
+```
+
+In the histogram from figure \@ref(fig:dist-fgm), we can see in the histogram how many shots have been taken from each distance. Around $3 feet$ and $25 feet$, we can notice the most number of shooting attempts from the players.
+In the boxplot from figure \@ref(fig:dist-fgm), shots made and missed are being compared to the distance using a boxplot. We can visually assume that the mean distance of shots made($~10 feet$) is smaller than the mean distance of shots missed($~18 feet$). This is logical because shooting closer to the basket should usually result in a higher chance of scoring.
+
+```{r scatter2, echo=FALSE, comment=NA, fig.cap='Scatter plot and correlation results between the distance and the shot\'s accuracy', fig.height = 3, fig.width = 6}
+
+ggscatter(DISTdf, x = 'DISTANCES', y = 'ACCURACY')+
+stat_cor(method = "spearman", alternative='two.sided', 
+         label.x=10, label.y=15, size=5)+             
+geom_smooth(method = "lm", se=TRUE, color='red', formula = y~x,
+            level=0.99)
+
+```
+
+The entry of the dataset for the distances does not really consist of "the realisation of a random variable". Therefore it is more meaningful to consider the $Spearman$ correlation instead of the $pearson$ correlation. Thus the data indicate a very strong negative correlation ($R=-0.82$) with a very small $p-value$ between Distance and Accuracy, as shown in figure \@ref(fig:scatter2); the variable Accuracy seems to decrease almost linearly with the Distance.
+
+Therefore we might suggest that shooting from a further distance negatively impact the scoring chances, shooting from a closer range gives more successful results. Since the sample size is $n=36$, the result of our correlation analysis might be reliable.   
+
+
+## Kyle Korver's shooting accuracy {#sec:Kyle}
+
+```{r threepts-tab, echo=FALSE, fig.align='center'}
+
+knitr::kable(head(THREE_ACCdf, 5), caption = 'The best three point shooters',
+   booktabs = TRUE)
+```
+
+In table \@ref(tab:threepts-tab), we can check the top three point scorers in the 2014-2015 NBA regular season. $Kyle$ $Korver$ is the best three point shooter with a $49$% accuracy, $5$ more than the runner-up $Klay$ $Thompson$. We can notice that $Kyle$ $Korver$ has $336$ attempts, much lower than $Stephen$ $Curry$ with $436$ shots taken. This might be because of the number of games played, injuries, and a lot of other factors that can affect these values.
+
+```{r kshot-fgm, echo=FALSE,fig.show='hold', fig.cap='Histogram of Kyle Korver\'s shot\'s distances density and a Boxplot of his shot\'s result from the distance taken', out.width="50%"}
+
+KSHOT <- nba$SHOT_DIST[nba$PLAYER_NAME=='Kyle Korver']
+KFGM <- nba$FGM[nba$PLAYER_NAME=='Kyle Korver']
+
+hist(KSHOT, col='cyan', xlab='Kyle Korver\'s shooting distance')
+
+boxplot(KSHOT ~ KFGM, col=rainbow(2), xlab='missed or made', ylab='Kyle Korver\'s shooting distance')
+```
+
+In the histogram from figure \@ref(fig:kshot-fgm), we see the number of shots taken by $Kyle$ $Korver$ from each distance, we realise that his favorite distance to shoot from is approximately between $20$ and $25$ feet.
+In the boxplot from the same figure, we compare the shots made or missed with each distance taken from. There does not seem to be any relevant difference in the scoring between the distances he is shooting from. We will test this hypothesis with a t-test between shots taken before and after $22 feet$. We chose this distance because it is the start of the three point line.
+
+\newpage
+
+```{r, echo=FALSE, comment=NA}
+
+t4 <- t.test(nba$FGM[nba$PLAYER_NAME=='Kyle Korver' & nba$SHOT_DIST<22], nba$FGM[nba$PLAYER_NAME=='Kyle Korver' & nba$SHOT_DIST>=22])
+
+cat('two sample t-test')
+cat('p-value:', t4$p.value)
+cat('confidence interval:', t4$conf.int)
+cat('sample estimates:', t4$estimate)
+
+```
+
+The obtained p-value is very large $p-value=0.49$, so that we do not reject $H_{0}$ for $H_1$ and we thus conclude that the number of points scored from a distance more or less than 22 are likely the same for $Kyle$ $Korver$. The sample size is very large, so that the previous conclusion can be reliable.
+We may find this observation to be usually not what would we expect as players would score more from a closer distance to the basket, but in this case, $Kyle$ $Korver$ likes to shoot from long distances, he has $339$ attempts from beyond the arc of three point with only $112$ attempts from inside the line. In addition, he is the top three point scorer in the league, this can be an explanation as to why there is no difference between the points scored from distances for him.
+
+# Conclusion 
+
+To conclude this report, we used various descriptive and inferential statistics to analyse the NBA 2014-2015 regular season dataset. We performed $t-tests$ for the means between two samples, some parametric($pearson$) and non-parametric($spearman$) $correlation$ analyses, also a $Kruskal-Wallis$ test for the median of multiple samples which was an alternative to the $anova$ test. In addition, we checked all the conditions required for each parametric test with some $shapiro-wilk$ test for normality if the sample size was not big enough. Furthermore, we used $Fligner-Killeen$, $bartlett$ and $Levene$ tests to check for homogeneity of variances. Moreover, many figures were used to describe and visualise the data, using $histograms$, $plots$, $pie-charts$ and $boxplots$ wherever necessary.
+
+To sum up the main ideas that we can extract from this report:
+
+1. Teams playing at home might have a higher chance of winning than the teams playing away (Section \@ref(sec:Home-Away));
+2. Teams with a three point playing style are more likely to have a better ranking than the teams focusing more on a two points style of play (Section \@ref(sec:PlayingStyle));
+3. A possible correlation between the three points per game scored and the win rate of a team (Section \@ref(sec:PlayingStyle);
+4. Homogeneity of variances(points per game scored by players) between the different Teams (Section \@ref(sec:PPGinTeams));
+5. The median of points per game scored by the players might not be impacted by the rank of their respective Team (Section \@ref(sec:PPGinTeams));
+6. Shooting from a further distance might negatively impact the scoring chances, shooting from a closer range can give more successful results (Section \@ref(sec:Shot-Dist));
+7. The shooting distance for $Kyle$ $Korver$ does not seem to affect his shooting accuracy (Section \@ref(sec:Kyle)).
+
+The results shown appear to be statistically significant and relevant. Nevertheless, to be even more accurate and precise in our analysis, we could use more datasets from other years of the NBA season's to strengthen all the observations and deductions made.
+
+
+# References
+
+1. Entine, O.(2007). *The Role of Rest in the NBA Home-Court Advantage* 
+Available at: http://www-stat.wharton.upenn.edu/~dsmall/nba_rest_submitted.pdf 
+
+2. Cheema, A.(2021). *Does NBA Officiating Favor the Home Team?*
+Available at: https://www.thespax.com/nba/does-nba-officiating-favor-the-home-team/ 
+
+3. Babb, S.(2013). *How the 3-Point Shot Has Revolutionized the NBA*
+Available at: https://bleacherreport.com/articles/1715367-how-the-3-point-shot-has-revolutionized-the-nba 
+
+4. Goldsberry, K.(2019). *The NBA is obsessed with 3s, so let's finally fix the thing*
+Available at: https://www.espn.co.uk/nba/story/_/id/26633540/the-nba-obsessed-3s-let-fix-thing 
+
+5. Grant, A.(2018). *The Problem with All-Stars*
+Available at: https://www.linkedin.com/pulse/problem-all-stars-adam-grant 
+
+
+# Appendix
+```{r, echo=FALSE, fig.align='center'}
+
+knitr::kable(
+   TEAMdf, caption = 'Team\'s playing style and win percentage',
+   booktabs = TRUE)
+```
+
+```{r, echo=FALSE, fig.align='center'}
+
+knitr::kable(
+  head(DISTdf, 25), caption = 'Accuracy(in percentage) for each shooting distance(in feet) for all players',
+   booktabs = TRUE)
+
+```
+
+
+
+
